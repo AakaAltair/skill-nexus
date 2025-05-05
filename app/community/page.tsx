@@ -9,7 +9,7 @@ import CommunityPostCard from '@/components/CommunityPostCard'; // Path to your 
 import Modal from '@/components/Modal'; // Your existing Modal component
 import CommunityPostModal from '@/components/CommunityPostModal'; // Path to your Post Modal component
 import { useRouter } from 'next/navigation';
-import { PlusCircle, Loader2, Search, ListFilter, SlidersHorizontal } from 'lucide-react'; // Icons
+import { PlusCircle, Loader2, Search, ListFilter, SlidersHorizontal, AlertCircle } from 'lucide-react'; // Added AlertCircle
 
 const API_BASE_URL = '/api/community/posts'; // Base URL for the community posts API
 
@@ -55,73 +55,121 @@ export default function CommunityFeedPage() {
       if (!user && filters.showMyPosts) {
         setFilters(prev => ({ ...prev, showMyPosts: false }));
       }
+      // No need to trigger fetch here, the effect below handles it based on authLoading
     });
     return () => unsubscribe();
-  }, [auth, filters.showMyPosts]); // Re-check if showMyPosts was true
+  }, [auth, filters.showMyPosts]); // Dependency is fine
 
   // --- Fetch Posts Function ---
   const fetchPosts = useCallback(async (isInitialFetch = true) => {
-    // Prevent fetching if already loading or no more posts (unless initial)
-    if ((loading && !isInitialFetch) || (!hasMore && !isInitialFetch)) return;
+    // Prevent fetching if not authenticated (as API requires it)
+    // Also prevent if already loading or no more posts (unless initial)
+    if (!currentUser || (loading && !isInitialFetch) || (!hasMore && !isInitialFetch)) {
+        if (!currentUser && !authLoading) { // Only set error if auth is resolved and no user
+            console.log("FetchPosts skipped: User not authenticated.");
+            setPosts([]); // Clear posts if user logs out
+            setHasMore(false); // No more posts if not logged in
+            setError("Please sign in to view the community feed.");
+            setLoading(false); // Ensure loading stops
+        } else {
+            console.log("FetchPosts skipped: Conditions not met (loading, no more, or auth loading).");
+        }
+        return; // Stop execution
+    }
+
 
     setLoading(true);
-    if (isInitialFetch) setError(null);
+    if (isInitialFetch) setError(null); // Clear previous errors on new fetch/filter
 
     // Build URL with filters and sorting
     let url = `${API_BASE_URL}?limit=15&sortBy=${filters.sortBy}`;
     if (filters.category) url += `&category=${encodeURIComponent(filters.category)}`;
     if (filters.search) url += `&search=${encodeURIComponent(filters.search)}`; // NOTE: Backend search needs implementation
-    if (filters.showMyPosts && currentUser?.uid) { // Ensure currentUser exists before accessing uid
+    if (filters.showMyPosts) { // No need for currentUser?.uid check here, already checked above
          url += `&userId=${currentUser.uid}`;
     }
     if (!isInitialFetch && lastDocId) url += `&lastDocId=${lastDocId}`;
 
     try {
-      console.log(`Fetching posts from: ${url}`);
-      const response = await fetch(url);
+      // *** GET AUTH TOKEN ***
+      const token = await currentUser.getIdToken();
+      if (!token) {
+          throw new Error("Could not retrieve authentication token.");
+      }
+
+      console.log(`Fetching posts from: ${url} with auth token.`);
+      const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+              // *** ADD AUTH HEADER ***
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json', // Optional for GET, but good practice
+          },
+      });
+
       if (!response.ok) {
         const errorData = await response.json().catch(()=>({message: `API Error ${response.status}`}));
-        if (isInitialFetch) throw new Error(errorData.message || `Failed to fetch posts (${response.status})`);
-        else { console.warn("Failed to fetch more posts:", errorData.message); setHasMore(false); }
-      } else {
-        const data = await response.json(); const fetchedPosts: CommunityPost[] = data.posts;
-        setPosts(prevPosts => isInitialFetch ? fetchedPosts : [...prevPosts, ...fetchedPosts]);
-        setHasMore(fetchedPosts.length === 15); // Assume more if limit is reached
-        if (fetchedPosts.length > 0) { setLastDocId(fetchedPosts[fetchedPosts.length - 1].id); }
-        else if (isInitialFetch) { setLastDocId(null); }
+        // Handle specific auth error potentially
+        if (response.status === 401 || response.status === 403) {
+             throw new Error(errorData.message || "Authentication failed. Please sign in again.");
+        }
+        throw new Error(errorData.message || `Failed to fetch posts (${response.status})`);
       }
+
+      const data = await response.json();
+      const fetchedPosts: CommunityPost[] = data.posts || []; // Ensure posts is always an array
+
+      setPosts(prevPosts => isInitialFetch ? fetchedPosts : [...prevPosts, ...fetchedPosts]);
+      setHasMore(fetchedPosts.length === 15); // Assume more if limit is reached
+      if (fetchedPosts.length > 0) {
+          setLastDocId(fetchedPosts[fetchedPosts.length - 1].id);
+      } else if (isInitialFetch) {
+           // If initial fetch returns 0, don't change lastDocId (it's already null)
+           // Ensure hasMore is false if 0 posts are returned initially
+           setHasMore(false);
+      }
+      // Error state is handled in catch block
+
     } catch (err) {
       console.error('Fetch posts error:', err);
-      if (isInitialFetch) setError((err as Error).message);
-      setHasMore(false);
-    } finally { setLoading(false); }
-  }, [filters, lastDocId, hasMore, currentUser?.uid, loading]); // Add loading to prevent concurrent fetches
-
-  // --- Effect for Initial Fetch / Filter Change ---
-  useEffect(() => {
-    // Only fetch if auth state is determined
-    if (!authLoading) {
-      console.log("Auth loaded or Filters changed, triggering fetch:", filters);
-      setPosts([]); // Reset posts when filters change
-      setLastDocId(null); // Reset pagination cursor
-      setHasMore(true); // Assume there might be more posts with new filters
-      fetchPosts(true); // Trigger the fetch
+      setError((err as Error).message); // Set the error message
+      setHasMore(false); // Stop pagination on error
+      if (isInitialFetch) setPosts([]); // Clear posts on initial fetch error
+    } finally {
+      setLoading(false);
     }
-  // Depend on the filters object and authLoading status
-  // currentUser.uid is included to refetch if user logs in/out AND showMyPosts is checked
-  }, [authLoading, filters, currentUser?.uid]);
+  // Depend on filters, currentUser (for token), authLoading (to wait)
+  // Removing lastDocId, hasMore, loading as direct dependencies of useCallback
+  // fetchPosts calls itself recursively via scroll, so these change internally
+  // We need currentUser.uid here because if the user changes, the token changes.
+  }, [filters, currentUser, authLoading]);
+
+  // --- Effect for Initial Fetch / Filter Change / Auth Change ---
+  useEffect(() => {
+    // Only trigger fetch when authentication is resolved
+    if (!authLoading) {
+      console.log("Auth loaded or Filters changed, triggering fetch:", filters, "User:", !!currentUser);
+      setPosts([]); // Reset posts
+      setLastDocId(null); // Reset pagination cursor
+      setHasMore(true); // Assume there might be more posts
+      fetchPosts(true); // Trigger the initial fetch
+    }
+  // Depend on the filters object, authLoading status, and currentUser
+  // Fetch should re-run if user logs in/out OR filters change, BUT only when auth is resolved.
+  }, [authLoading, filters, currentUser, fetchPosts]); // Added fetchPosts as dependency
 
   // --- Effect for Infinite Scroll ---
   useEffect(() => {
     const handleScroll = () => {
-      // Don't fetch if already loading, no more posts, or not near bottom
-      if (loading || !hasMore || window.innerHeight + window.scrollY < document.body.offsetHeight - 500) return;
+      // Don't run if auth still loading, or fetchPosts logic will handle skip
+      if (authLoading || loading || !hasMore || window.innerHeight + window.scrollY < document.body.offsetHeight - 500) return;
       console.log("Near bottom, fetching more posts...");
-      fetchPosts(false); // Fetch next page
+      fetchPosts(false); // Fetch next page (will include token)
     };
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll); // Cleanup listener
-  }, [loading, hasMore, fetchPosts]); // fetchPosts dependency is okay here
+  }, [authLoading, loading, hasMore, fetchPosts]); // Include authLoading here
+
 
   // --- Filter Change Handler ---
   const handleFilterInputChange = (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -139,7 +187,7 @@ export default function CommunityFeedPage() {
   // --- Modal Handlers ---
   const openPostModal = (postId: string) => { if (!postId) { console.error("Invalid postId"); return; } setSelectedPostId(postId); setIsModalOpen(true); };
   const closePostModal = () => { setSelectedPostId(null); setIsModalOpen(false); };
-  const handleCreatePostClick = () => { if (currentUser) { router.push('/community/create'); } else { alert('Please sign in to create a post.'); } };
+  const handleCreatePostClick = () => { if (currentUser) { router.push('/community/create'); } else { setError('Please sign in to create a post.'); /* Or use a dedicated notification */ } };
 
   // --- Styles for Controls ---
   const controlBaseStyle = "h-9 text-sm bg-white border border-gray-300 rounded-md focus:ring-1 focus:ring-[#0070F3] focus:border-[#0070F3] outline-none transition-colors text-black";
@@ -148,12 +196,13 @@ export default function CommunityFeedPage() {
   const checkboxStyle = "h-4 w-4 rounded border-gray-300 text-[#0070F3] focus:ring-[#0070F3] focus:ring-offset-1 disabled:opacity-50";
   const selectArrowStyle = { backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: `right 0.5rem center`, backgroundSize: `1.5em 1.5em`};
 
+  // --- UI Render ---
   return (
-    // Inherits background from layout body
-    <div className="container mx-auto px-4 py-8 pt-20">
+    <div className="container mx-auto px-4 py-8 pt-20"> {/* Added pt-20 for fixed navbar */}
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <h1 className="text-3xl font-bold text-black">Community Feed</h1>
+        {/* Show create button only if logged in (and auth resolved) */}
         {!authLoading && currentUser && (
           <button
             type="button"
@@ -168,7 +217,8 @@ export default function CommunityFeedPage() {
 
       {/* --- Filter Bar --- */}
       <div className="sticky top-16 z-20 bg-white/95 backdrop-blur-sm border border-gray-200 py-3 px-4 mb-8 rounded-md shadow-sm">
-        <div className="container mx-auto flex flex-col sm:flex-row flex-wrap items-center gap-3 sm:gap-4">
+        {/* Content inside filter bar */}
+         <div className="container mx-auto flex flex-col sm:flex-row flex-wrap items-center gap-3 sm:gap-4">
           {/* Search Input */}
           <div className="w-full sm:w-auto sm:flex-grow lg:flex-grow-0 relative">
              <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
@@ -179,6 +229,8 @@ export default function CommunityFeedPage() {
               value={filters.search}
               onChange={handleFilterInputChange}
               className={`${inputStyle} w-full sm:w-64 pl-9`} // pl-9 for icon
+              // Disable search if not logged in? Optional.
+              // disabled={authLoading || !currentUser}
             />
           </div>
 
@@ -191,8 +243,9 @@ export default function CommunityFeedPage() {
                  name="category"
                  value={filters.category}
                  onChange={handleFilterInputChange}
-                 className={`${selectStyle} w-full sm:w-auto`} // pl-9 already included in selectStyle base
+                 className={`${selectStyle} w-full sm:w-auto`}
                  style={selectArrowStyle}
+                 // disabled={authLoading || !currentUser}
             >
                 <option value="">All Categories</option>
                 {COMMUNITY_POST_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
@@ -207,7 +260,7 @@ export default function CommunityFeedPage() {
                        name="showMyPosts"
                        checked={filters.showMyPosts}
                        onChange={handleFilterInputChange}
-                       disabled={authLoading || !currentUser}
+                       disabled={authLoading || !currentUser} // Disable if not logged in
                        className={checkboxStyle}
                    />
                     <span className={`text-sm ${!currentUser ? 'text-gray-400' : 'text-black'}`}>
@@ -223,8 +276,9 @@ export default function CommunityFeedPage() {
                    name="sortBy"
                    value={filters.sortBy}
                    onChange={handleFilterInputChange}
-                   className={`${selectStyle} w-full sm:w-auto`} // pl-9 already included in selectStyle base
+                   className={`${selectStyle} w-full sm:w-auto`}
                    style={selectArrowStyle}
+                  //  disabled={authLoading || !currentUser}
                >
                    <option value="createdAt">Sort: Newest</option>
                    <option value="likesCount">Sort: Most Liked</option>
@@ -234,50 +288,62 @@ export default function CommunityFeedPage() {
       </div>
       {/* --- End Filter Bar --- */}
 
-      {/* Display initial loading error */}
-      {error && posts.length === 0 && !loading && (
-        <p className="text-red-500 text-center mb-4 mt-8">{error}</p>
-      )}
 
-      {/* Post Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
-        {/* Render cards only if not initial loading or if there's an error but some posts were loaded before */}
-         {!loading && posts.length === 0 && !error ? null : posts.map(post => (
-          <CommunityPostCard
-            key={post.id}
-            post={post}
-            currentUser={currentUser}
-            onPostClick={() => openPostModal(post.id)}
-          />
-        ))}
-        {/* Show skeleton loaders during initial load? (Optional enhancement) */}
-         {loading && posts.length === 0 && !error && (
-             <> {/* Placeholder for skeleton loaders */}
-                 <div className="h-64 bg-gray-200 rounded-md animate-pulse"></div>
-                 <div className="h-64 bg-gray-200 rounded-md animate-pulse hidden md:block"></div>
-                 <div className="h-64 bg-gray-200 rounded-md animate-pulse hidden lg:block"></div>
-             </>
-         )}
-      </div>
+      {/* --- Main Content Area --- */}
+      {authLoading ? (
+        // Show a simple loading state while checking auth
+        <div className="text-center mt-12 flex justify-center items-center text-gray-500">
+             <Loader2 className="animate-spin mr-2" size={24} />
+             <span>Checking authentication...</span>
+        </div>
+      ) : error ? (
+        // Show error message if fetch failed or user not logged in
+        <div className="text-center mt-12 text-red-600 bg-red-50 border border-red-200 rounded-md p-4 flex items-center justify-center gap-2">
+            <AlertCircle size={20} />
+            <span>{error}</span>
+        </div>
+      ) : loading && posts.length === 0 ? (
+        // Initial loading state (after auth check)
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
+            {/* Placeholder for skeleton loaders */}
+            <div className="h-64 bg-gray-200 rounded-md animate-pulse"></div>
+            <div className="h-64 bg-gray-200 rounded-md animate-pulse hidden md:block"></div>
+            <div className="h-64 bg-gray-200 rounded-md animate-pulse hidden lg:block"></div>
+        </div>
+      ) : posts.length === 0 ? (
+         // No posts found message
+         <div className="text-center mt-12 text-gray-500">
+           No posts found matching your criteria.
+         </div>
+      ) : (
+        // Display Post Grid
+        <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
+                {posts.map(post => (
+                <CommunityPostCard
+                    key={post.id}
+                    post={post}
+                    currentUser={currentUser} // Pass current user for like/delete checks etc.
+                    onPostClick={() => openPostModal(post.id)}
+                />
+                ))}
+            </div>
 
-      {/* Loading Indicator for infinite scroll */}
-      {loading && posts.length > 0 && ( // Only show spinner if posts already exist
-        <div className="text-center mt-8 flex justify-center items-center text-gray-500">
-          <Loader2 className="animate-spin mr-2" size={20} />
-          <span>Loading more posts...</span>
-        </div>
-      )}
+            {/* Loading Indicator for infinite scroll */}
+            {loading && posts.length > 0 && ( // Show only when loading more
+                <div className="text-center mt-8 flex justify-center items-center text-gray-500">
+                <Loader2 className="animate-spin mr-2" size={20} />
+                <span>Loading more posts...</span>
+                </div>
+            )}
 
-      {/* "No Posts" / "End of Feed" Messages */}
-      {!loading && posts.length === 0 && !error && (
-        <div className="text-center mt-12 text-gray-500">
-          No posts found matching your criteria.
-        </div>
-      )}
-      {!loading && !hasMore && posts.length > 0 && (
-        <div className="text-center mt-12 text-gray-500">
-          You've reached the end of the feed.
-        </div>
+            {/* "End of Feed" Message */}
+            {!loading && !hasMore && posts.length > 0 && (
+                <div className="text-center mt-12 text-gray-500">
+                You've reached the end of the feed.
+                </div>
+            )}
+        </>
       )}
 
       {/* Modal */}
@@ -286,7 +352,7 @@ export default function CommunityFeedPage() {
           <CommunityPostModal
             postId={selectedPostId}
             onClose={closePostModal}
-            currentUser={currentUser}
+            currentUser={currentUser} // Pass user to modal as well
           />
         </Modal>
       )}
