@@ -1,0 +1,513 @@
+✅ Accent Colors (used for borders, hover, highlights only):
+These should not be used for backgrounds or text—only for subtle emphasis like hover borders, highlights, or accents.
+
+✅ Text Color:
+Black — for all primary text (user and AI)
+
+✅ Background:
+White — clean and minimal
+
+Optional: Soft gradient or hue (you mentioned this can be used to give slight depth but not overpowering)
+## Design Guidelines
+
+### Typography
+
+-   **Font Family:** Use a clean, modern sans-serif font. (e.g., Inter, Roboto, or similar)
+-   **Font Sizes:**
+    -   Headings (H1-H3): 24px - 48px (adjust as needed)
+    -   Body Text: 16px
+    -   Small Text: 12px - 14px
+-   **Font Weights:**
+    -   Bold: 700
+    -   Regular: 400
+    -   Light: 300
+
+### Spacing
+
+-   **Padding:** Use 16px or 24px padding around content sections.
+-   **Margin:** Use 24px or 32px margins between elements.
+-   **Grid:** Maintain a consistent grid layout to align elements.
+
+### Interactive Elements
+
+-   **Buttons:**
+    -   Use Accent 1 (#0070F3) for primary buttons.
+    -   Use Accent 2 (#FF4081) for secondary buttons.
+    - Use Accent 3 (#4CAF50) for success related actions
+    -   Ensure clear hover and active states.
+-   **Links:**
+    -   Use Accent 1 (#0070F3) for links.
+    -   Underline on hover to indicate interactivity.
+- **Icons**
+    -  Icons should contrast well with the background.
+    - Icons should be clean and simplistic.
+- **Cards**
+    - card elements can have rounded corners.
+    - cards should use white background for emphasis
+
+### Imagery
+
+-   Use high-quality images.
+-   Maintain consistency in image style and tone.
+
+### General Style
+
+-   **Contrast:** Ensure good contrast between text and background.
+-   **Consistency:** Maintain a consistent style throughout the application.
+-   **Accessibility:** Follow accessibility guidelines to ensure usability for everyone.
+
+Overall Project Context:
+
+Framework: Next.js (App Router)
+
+Language: TypeScript
+
+Styling: Tailwind CSS (assumed)
+
+Backend: Firebase (Firestore Database, Firebase Authentication)
+
+Core UI Inspiration: Google Classroom (Clean, minimalist, card-based)
+
+I. Common Backend & Infrastructure Setup
+
+Firebase Admin SDK (lib/firebaseAdmin.ts):
+
+Purpose: Secure server-side communication with Firebase services (Firestore, Auth verification) from Next.js API Routes.
+
+Setup: Initializes the Firebase Admin app, ideally checking if already initialized (admin.apps.length === 0).
+
+Credentials: Configured to use service account credentials, preferably via environment variables (GOOGLE_APPLICATION_CREDENTIALS path or GOOGLE_APPLICATION_CREDENTIALS_JSON content) for security. Includes warnings if environment variables are missing. Explicitly configured storageBucket via FIREBASE_STORAGE_BUCKET environment variable during initialization to resolve issues with getStorage().bucket().
+
+Exports: Exports initialized service instances (firestore for Firestore, adminAuth for Auth) and potentially an initError variable to check initialization status in API routes. Also includes a verifyIdToken helper function using adminAuth.
+
+Firebase Client SDK (app/firebase.ts):
+
+Purpose: Client-side Firebase interactions, primarily Authentication (getAuth, onAuthStateChanged, signInWithPopup, signOut, getIdToken).
+
+Setup: Standard Firebase client SDK initialization using frontend configuration keys (stored in environment variables like NEXT_PUBLIC_FIREBASE_...).
+
+Firestore Database:
+
+Usage: Primary database for storing application data.
+
+Collections: projects, resources, placementDrives, studentAchievements. Subcollections (updates, comments) are used under parent documents (e.g., projects/{projectId}/updates, placementDrives/{driveId}/comments).
+
+Firestore Security Rules (firestore.rules):
+
+Purpose: Define access control for Firestore data.
+
+General Pattern:
+
+read: Often public (allow read: if true;) for main content listing/viewing (projects, resources, drives, achievements).
+
+create: Requires authentication (request.auth != null). Often includes checks that the user ID in the document (creatorId, uploaderId, postedById, studentId/creatorId) matches the authenticated user's UID (request.auth.uid). Basic validation on required fields (is string, size() > 0, etc.). Timestamp checks (request.time).
+
+update/delete: Requires authentication (request.auth != null) and ownership check (e.g., resource.data.creatorId == request.auth.uid). Prevents changing immutable fields like creatorId, createdAt. Timestamp checks (request.time).
+
+Subcollection Rules: Include checks for parent document existence (exists()) and potentially parent document properties (get(), e.g., commentsEnabled). Ownership for comments/updates typically tied to the comment/update author. Delete permissions sometimes extended to the parent document owner.
+
+II. Shared Frontend Components & Utilities
+
+components/Navbar.tsx:
+
+Purpose: Main site navigation. Displays links, handles user authentication state display (Sign In/Sign Out button, welcome message).
+
+Implementation: Declared as a Client Component ("use client";) because it uses useState, useEffect, usePathname, and Firebase client auth functions.
+
+lib/types/...: Central location for TypeScript interfaces (e.g., project.ts, resource.ts, placement.ts).
+
+lib/dateUtils.ts: Utility functions (formatTimestamp, formatSimpleDate) using date-fns for consistent date formatting across the UI.
+
+lib/themeUtils.ts: Provides getProjectThemeStyles function that takes an ID string, calculates a hash, and returns theme classes (e.g., backgroundClasses) for visually distinguishing items like Project cards and Banners (reused for Resources and Placements).
+
+components/Modal.tsx: A generic, reusable modal component for displaying forms or confirmation dialogs (used for Achievement posting/editing/viewing and Drive deletion).
+
+III. "Resources" Feature (Classroom Style - Link Based)
+
+Core Goal: Allow users to share links to educational resources, categorized and filterable. Initially planned with file uploads, but pivoted to link-sharing due to Firebase Storage billing requirements. The "classroom" detail view was deferred in favor of direct linking initially.
+
+Data Model (lib/types/resource.ts):
+
+Resource: id, title, description, linkURL (stores the external link), resourceType, branch, year, college, subject, uploaderId, uploaderName, uploaderPhotoURL, createdAt, updatedAt, tags, commentsEnabled.
+
+ResourceUpdate, ResourceComment: Defined for potential future detail view implementation.
+
+Backend API:
+
+/api/resources/route.ts:
+
+GET: Fetches list, returns { resources: [...] }. Handles limit param. No userId filter implemented in this version.
+
+POST: Creates a new resource. Handles JSON payload, validates required fields (title, linkURL, resourceType), gets uploader info from token, saves external linkURL to Firestore. Does not handle file uploads. Returns { message: ..., resourceId: ... }.
+
+/api/resources/[resourceId]/route.ts:
+
+GET, PATCH, DELETE implemented for single resource management (viewing details, editing link/metadata, deleting). Ownership check based on uploaderId.
+
+Frontend Pages:
+
+/resources/page.tsx: Client Component. Fetches list via GET /api/resources. Displays resources in a grid using ResourceCard. Implements client-side filtering (Type, Search, Branch, Year, College, Subject) and sorting. Includes "My Resources" and "Favorites" view toggles and logic (fetching with userId, using localStorage for favorites).
+
+/resources/create/page.tsx: Client Component. Form for adding a new resource link. Submits JSON data to POST /api/resources. Requires login.
+
+/resources/[resourceId]/page.tsx: Implemented with ResourceBanner, ResourceAnnouncementsStream, ResourceChatSidebar. Fetches single resource details and updates. Manages chat state.
+
+/resources/[resourceId]/edit/page.tsx: Implemented. Fetches resource, pre-populates form, handles PATCH request with changed fields. Checks ownership.
+
+Key Components:
+
+ResourceCard.tsx: Displays resource summary (title, type, uploader, category tags). Links directly to the internal detail page (/resources/[resourceId]). Includes themed top section and hover border effect. Optional favorite button integrated.
+
+ResourceBanner.tsx: Adapted from ClassroomBanner. Shows resource details, includes Edit/Delete/ChatToggle buttons (owner only) and an external link button. Uses themeUtils.
+
+ResourceAnnouncementsStream.tsx: Adapted from AnnouncementsStream. Handles resource updates (API calls to /api/resources/.../updates). Includes simulated file attachment UI.
+
+ResourceChatSidebar.tsx: Adapted from ProjectChatSidebar. Handles resource comments (API calls to /api/resources/.../comments).
+
+IV. "Placements Hub" Feature (Vertical Split)
+
+Core Goal: Provide a central hub for placement drives (news, details, Q&A) and student success stories (feed).
+
+Layout: Vertical split screen. Left pane (~65%) shows drive list or detail. Right pane (~35%) shows a persistent achievement feed.
+
+Data Models (lib/types/placement.ts):
+
+PlacementDrive: id, companyName, companyLogoURL, roleTitle, description, eligibilityCriteria, status, keyDates, packageDetails, applicationLink, applicationInstructions, location, eligibleBranches, contactPerson, commentsEnabled, postedById, postedByName, postedByPhotoURL, createdAt, updatedAt.
+
+StudentAchievement: id, creatorId, creatorName, creatorPhotoURL (poster info), placedStudentName, placedStudentBranch, placedStudentYear, placedStudentPhotoURL (placed student info), companyName, companyLogoURL, roleTitle, placementType, text, skills, location, salary, jobDescription, personalMessage, createdAt, updatedAt. (Model evolved to separate creator/placed student).
+
+PlacementComment: Standard comment structure for drive Q&A.
+
+PlacementUpdate: Standard update structure for drive announcements.
+
+Backend API:
+
+/api/placement/drives/route.ts: GET (list drives, handles status filter), POST (create drive, requires auth, should have role check). Returns { drives: [...] }.
+
+/api/placement/drives/[driveId]/route.ts: GET (single drive), PATCH (update drive, checks ownership/role), DELETE (delete drive, checks ownership/role).
+
+/api/placement/drives/[driveId]/updates/route.ts: GET, POST for drive updates (checks ownership/role for POST).
+
+/api/placement/drives/[driveId]/comments/route.ts: GET, POST for drive comments (checks commentsEnabled, auth for POST).
+
+/api/placement/achievements/route.ts: GET (list achievements), POST (create achievement, uses token for creator, body for placed student info and details). Returns { achievements: [...] }.
+
+/api/placement/achievements/[achievementId]/route.ts: GET (single achievement), PATCH (update achievement, checks ownership via creatorId), DELETE (delete achievement, checks ownership via creatorId).
+
+Frontend Page (/placements/page.tsx):
+
+Manages the vertical split layout.
+
+Fetches initial drive list and achievement list.
+
+Manages selectedDrive state to switch left pane between list and detail view.
+
+Manages state for drive filters (searchTerm, statusFilter, companyFilter, etc.).
+
+Manages state for chat sidebar (isChatOpen) and delete modal (showDeleteModal, etc.).
+
+Renders PlacementFilters, PlacementCard (in list view), PlacementDetailView (when drive selected), and PlacedStudentFeed.
+
+Renders PlacementChatSidebar and delete modal conditionally.
+
+Contains handlers for selecting drives, going back, triggering delete, and toggling chat.
+
+Frontend Components (Left Pane - Drives):
+
+PlacementFilters.tsx: Renders filter controls (Search, Status, Company, Role, Branch inputs/selects). Receives state/handlers from parent.
+
+PlacementCard.tsx: Displays drive summary (Logo/Placeholder top, Company, Role, Key Info Snippets, Status). Click handled by parent to show detail.
+
+PlacementDetailView.tsx: Container for detail view. Renders PlacementDriveBanner and PlacementAnnouncementsStream. Fetches specific drive data + updates via parent state effect.
+
+PlacementDriveBanner.tsx: Themed banner. Displays drive title, company, meta info. Includes Edit, Delete, and Q&A buttons (conditional on ownership/settings).
+
+PlacementAnnouncementsStream.tsx: Adapted stream component for posting/viewing drive updates.
+
+PlacementChatSidebar.tsx: Adapted sidebar for drive-specific Q&A/comments.
+
+Frontend Components (Right Pane - Achievements):
+
+PlacedStudentFeed.tsx: Manages the right pane. Includes "Share Success" button linking to create page. Renders achievements in a 2-column grid. Handles triggering the Detail/Edit modal for achievements. Manages state/logic for viewing/editing/deleting achievements within the modal.
+
+PlacedStudentPost.tsx: Redesigned card with dark gradient, top border accent. Displays placedStudentName, company/role, concise text/details. No creator avatar. Links to detail page.
+
+Frontend Management Pages:
+
+/placements/create/page.tsx: Dedicated page/form for creating new drives.
+
+/placements/[driveId]/edit/page.tsx: Dedicated page/form for editing existing drives.
+
+/placements/achievements/create/page.tsx: Dedicated page/form for creating achievement posts (collects placed student name, details).
+
+/placements/achievements/[achievementId]/page.tsx: Implemented. Dedicated page for viewing full achievement details. Includes Edit/Delete buttons for the creator.
+
+/placements/achievements/[achievementId]/edit/page.tsx: Implemented. Dedicated page for editing achievement posts. Fetches data, checks ownership (creatorId), saves changes via PATCH.
+
+
+Core & Shared:
+
+app/layout.tsx:
+
+Purpose: Defines the root layout for the entire application. Includes <html>, <body>, font setup (Geist), global CSS import (globals.css), and renders the main Navbar and the {children} (the content of the specific page being viewed).
+
+Key Feature: Contains the container (<main>) wrapping {children} which has top padding (pt-16 or similar) to prevent content from rendering underneath the fixed Navbar.
+
+app/globals.css:
+
+Purpose: Defines global CSS styles, including Tailwind CSS base imports (@tailwind base; ...) and any custom global styles (like scrollbar styling, base font settings, Markdown table styles).
+
+lib/types/project.ts:
+
+Purpose: Defines shared TypeScript interfaces for the Project data structure, including related types like ProjectMember, ProjectType, ProjectStatus. This ensures type safety across frontend and backend when handling project data. (Should also contain ProjectUpdate, Comment, Attachment).
+
+lib/types/resource.ts: (Created for the Resources feature)
+
+Purpose: Defines shared TypeScript interfaces for the Resource data structure (ResourceType, YearLevel, Resource).
+
+lib/dateUtils.ts: (Created for refined timestamps)
+
+Purpose: Contains helper functions (formatTimestamp, formatFullTimestamp, formatSimpleDate) using the date-fns library to format date/timestamp strings consistently across the UI.
+
+app/firebase.ts:
+
+Purpose: Initializes the Firebase Client SDK. Configured with NEXT_PUBLIC_ environment variables (from .env.local). Exports initialized instances like auth (for getAuth) and storage (for getStorage - used for file uploads). Used by frontend components for authentication and eventually file uploads.
+
+lib/firebaseAdmin.ts:
+
+Purpose: Initializes the Firebase Admin SDK for secure backend operations. Reads the service account key file path from the GOOGLE_APPLICATION_CREDENTIALS environment variable. Exports initialized firestore and adminAuth instances. Used exclusively by API routes (app/api/...).
+
+.env.local:
+
+Purpose: Stores environment variables, including public Firebase client config (NEXT_PUBLIC_...), secret API keys (GEMINI_API_KEY, YOUR_SEARCH_API_KEY), and the path to the service account key file (GOOGLE_APPLICATION_CREDENTIALS). Must not be committed to Git.
+
+.gitignore:
+
+Purpose: Specifies files and directories that Git should ignore. Crucially, includes /node_modules, .next/, .env*, and the specific service account JSON filename (firebase-service-account-key.json).
+
+II. Nexai Chatbot:
+
+app/nexai/page.tsx:
+
+Purpose: The frontend page component for the Nexai chatbot UI.
+
+Functionality: Manages chat message state (conversation array using ChatTurn interface), handles user input, calls the backend API (/api/nexai) to get bot responses, displays the conversation flow, handles loading states. Implements auto-scrolling. Uses ReactMarkdown to render bot responses. Styled for minimalist look.
+
+app/api/nexai/route.ts:
+
+Purpose: The backend API route that receives user messages and interacts with the Google Gemini API.
+
+Functionality: Handles POST requests. Initializes the Gemini client (GoogleGenerativeAI) using GEMINI_API_KEY. Defines "Tools" (webSearchTool, calculatorTool) for Gemini function calling. Includes logic to:
+
+Receive message and history from the client.
+
+Call chat.sendMessage().
+
+Check if Gemini requested a function call (response.functionCalls()).
+
+If yes, call the corresponding backend tool function (callTool, which uses Search API or mathjs).
+
+Send tool results back to Gemini.
+
+Return the final text response from Gemini to the frontend.
+
+Includes robust error handling.
+
+III. Projects Showcase:
+
+app/projects/page.tsx (Project List Page):
+
+Purpose: Displays a browsable list of all shared projects. Acts as the main entry point for the Projects feature.
+
+Functionality: Client Component. Fetches project list from GET /api/projects (optionally filtered by userId for "My Projects"). Manages state for projects, loading, errors, user auth, view (all, myProjects, favorites), filters (search, category, status), and sorting. Implements client-side filtering/sorting. Renders a sticky filter bar and a grid of ProjectCard components. Handles localStorage for favorites. Conditionally shows "Create Project" link.
+
+app/projects/create/page.tsx (Create Project Page):
+
+Purpose: Provides a form for authenticated users to create new projects.
+
+Functionality: Client Component. Renders form inputs for all required and optional project fields (title, description, skills, type, status, location, links, comments enabled toggle, etc.). Requires login (redirects otherwise). Handles form submission (POST /api/projects with auth token), validation, and redirects on success.
+
+app/projects/[projectId]/page.tsx (Single Project View Page):
+
+Purpose: Displays the detailed view of a single project, inspired by Google Classroom's stream view.
+
+Functionality: Client Component. Fetches project details (GET /api/projects/[projectId]), updates (GET /updates), and comments (GET /comments). Renders the ClassroomBanner and AnnouncementsStream. Manages state for and conditionally renders the ProjectChatSidebar. Includes delete confirmation modal logic (triggered by banner). Has a "Back" button (router.back()).
+
+app/projects/[projectId]/edit/page.tsx (Edit Project Page):
+
+Purpose: Provides a form for the project owner to edit existing project details.
+
+Functionality: Client Component. Fetches current project data (GET /api/projects/[projectId]). Requires login and verifies ownership, redirects/errors otherwise. Pre-fills form with existing data. Handles form submission (PATCH /api/projects/[projectId] with auth token, sending only changed fields). Redirects back to the project view page on success/cancel. Includes the commentsEnabled toggle.
+
+components/ProjectCard.tsx:
+
+Purpose: Reusable UI component to display a project summary on the list page.
+
+Functionality: Accepts project data and favorite status/handler. Displays key info (image/placeholder, title, description snippet, creator, type, status, skills, location, timestamps). Links to the project view page (/projects/[projectId]). Includes a favorite button.
+
+components/ClassroomBanner.tsx:
+
+Purpose: Displays the header banner on the single project view page.
+
+Functionality: Accepts project data and isOwner status. Displays cover image or themed gradient. Shows title and key meta info (creator, date, location, type, status). Conditionally renders "Edit" (links to edit page) and "Delete" (triggers delete modal) buttons for the owner.
+
+components/AnnouncementsStream.tsx:
+
+Purpose: Displays the feed of updates/announcements for a project and the form for the owner to post new updates.
+
+Functionality: Client Component. Accepts projectId, isOwner, initialUpdates, currentUser. Renders the "Post Update" form (owner only) with text input and simulated file attachment UI (using drag-and-drop, storing temporary file metadata). Handles update submission (POST /updates, includes auto-detected links and temp file metadata). Renders the list of updates, displaying content (via ReactMarkdown) and attached links/temporary files. Does not handle comments.
+
+components/ProjectChatSidebar.tsx:
+
+Purpose: Provides the dedicated, global chat interface for a project in a collapsible sidebar.
+
+Functionality: Client Component. Controlled by isOpen prop. Fetches all comments for the project (GET /comments). Uses buildCommentTree helper and CommentItem to render nested replies. Manages state for input/replies. Handles posting top-level messages and replies (POST /comments, includes parentId). Implements auto-scroll.
+
+IV. Backend API Routes (Summary)
+
+All API routes are under app/api/.
+
+They use the Firebase Admin SDK for secure Firestore access.
+
+They handle specific CRUD operations for projects, updates, and comments.
+
+Protected routes (POST, PATCH, DELETE) perform authentication (verify ID token) and authorization (check ownership where necessary).
+
+Timestamp conversion is handled before sending JSON responses.
+
+Use standard NextResponse.json() for responses.
+
+Project Context:
+Framework: Next.js (App Router)
+Language: TypeScript
+Backend: Firebase (Firestore Database, Firebase Authentication, implicitly Firebase Storage for future media)
+Core UI Inspiration: Clean, minimalist, card-based (Google Classroom style).
+Authentication Pattern: Local state management using onAuthStateChanged in page components, passing currentUser down as a prop. API routes use Firebase Admin SDK with token verification for authentication/authorization.
+Existing Features (as described initially): Projects, Resources, Placements, Nexai Chatbot.
+Implemented Features & Created/Modified Files:
+Community Feed Feature (/community)
+Goal: Allow students/clubs to post updates/events with likes and comments in a multi-column feed.
+Data Model: Defined the structure for feedPosts collection and comments, likes subcollections. (Interface CommunityPost, CommunityComment, CommunityLike - assumed to be in lib/types/community.ts).
+Firestore Security Rules: Added/updated firestore.rules to define read/write access for feedPosts, feedPosts/{postId}/comments, and feedPosts/{postId}/likes. Rules enforce ownership, authentication, timestamp checks, and prevent direct modification of counters.
+Backend API Routes:
+app/api/community/posts/route.ts: Implemented GET (list with basic filters, sorting, pagination) and POST (create post). Handles temporary Data URL storage for media. Includes authentication for POST.
+app/api/community/posts/[postId]/route.ts: Implemented GET (single post), PATCH (update post), DELETE (delete post). Includes authentication and ownership checks.
+app/api/community/posts/[postId]/comments/route.ts: Implemented GET (list comments) and POST (add comment). Uses Firestore transactions for atomic commentCount updates. Includes authentication.
+app/api/community/posts/[postId]/likes/route.ts: Implemented POST (add like) and DELETE (remove unlike). Uses Firestore transactions for atomic likeCount updates. Includes authentication.
+Frontend Pages:
+app/community/page.tsx: Implemented the main feed page. Uses local auth state. Fetches posts, implements infinite scroll, basic filtering UI ("My Posts"), renders CommunityPostCard. Opens modal (Modal) displaying CommunityPostModal on card click. Includes "Create Post" button (visible when authenticated).
+app/community/create/page.tsx: Implemented the post creation form. Uses local auth state (redirects if not logged in). Handles text content, link URL, event details, categories, and temporary Data URL handling for media uploads. Sends POST request to /api/community/posts.
+app/community/[postId]/edit/page.tsx: Implemented the post edit form. Uses local auth state (redirects if not logged in). Fetches existing post data, checks ownership, pre-fills form, handles temporary Data URL handling for media editing. Sends PATCH request to /api/community/posts/[postId].
+Frontend Components:
+components/CommunityPostCard.tsx: Displays post summary in the feed grid. Shows creator, date (event date if applicable, else creation date), text snippet, media preview (Data URL), like/comment counts. Handles client-side like toggle (Firestore write + backend count update via API). Triggers onPostClick prop.
+components/CommunityPostModal.tsx: Displays full post details in a modal. Shows all content, media (Data URLs), event details, links, categories, engagement stats. Displays comments list (real-time via onSnapshot). Includes comment input form (submits via API). Includes Edit/Delete buttons for post creator. Implemented sticky comment input area layout. Added timestamp display to comments.
+
+
+
+
+Resume Style Dashboard Feature (/dashboard)
+Goal: Display a student's resume information (including platform projects) in a structured, editable dashboard.
+Data Model: Defined the structure for studentProfiles collection where document ID is userId. (Interface StudentProfile and nested types like ExperienceItem etc. - inline or in lib/types/profile.ts).
+Firestore Security Rules: Added firestore.rules for studentProfiles/{userId} allowing only the owner to read/write.
+Backend API Route:
+app/api/profile/route.ts: Implemented GET (fetches profile for authenticated user, creates default if missing) and PATCH (updates profile with provided fields). Includes authentication and basic validation.
+Frontend Page:
+app/dashboard/page.tsx: Implemented the main dashboard page. Uses local auth state (redirects if not logged in). Fetches profile data (/api/profile) and platform projects (/api/projects?userId=...). Renders distinct sections for Profile Header, Summary, Experience, Education, Certifications, Projects (Platform & Manual), Skills, Languages, Awards, Extracurriculars, and placeholder widgets. Uses a sticky sidebar (DashboardSidebar) for navigation on medium+ screens. Implemented scroll spy (Intersection Observer) to highlight the active section in the sidebar. Added individual hide/unhide functionality for Platform Projects using localStorage. Renders placeholder "Edit" and "Add" buttons that trigger a modal (Modal).
+Frontend Components (Edit Forms - triggered by modal):
+components/EditSummaryForm.tsx: Form to edit the summary text. Sends PATCH { summary: ... } to /api/profile.
+components/EditExperienceForm.tsx: Form to add/edit/delete Experience items (array). Handles date inputs and "Present". Sends PATCH { experience: [...] } to /api/profile.
+components/EditEducationForm.tsx: Form to add/edit/delete Education items (array). Handles date inputs. Sends PATCH { education: [...] } to /api/profile.
+components/EditCertificationsForm.tsx: Form to add/edit/delete Certifications items (array). Handles date inputs and "No Expiration". Sends PATCH { certifications: [...] } to /api/profile.
+components/EditSkillsForm.tsx: Form to add/edit/delete Skill items (array with category). Uses input for skill name and select for category. Sends PATCH { skills: [...] } to /api/profile.
+components/EditLanguagesForm.tsx: Form to add/edit/delete Language items (array with proficiency). Uses input for language and select for proficiency. Sends PATCH { languages: [...] } to /api/profile.
+components/EditAwardsForm.tsx: Form to add/edit/delete Award items (array). Handles date inputs. Sends PATCH { awards: [...] } to /api/profile.
+components/EditExtracurricularsForm.tsx: Form to add/edit/delete Extracurricular items (array). Handles date inputs and "Present". Sends PATCH { extracurriculars: [...] } to /api/profile.
+components/EditManualProjectsForm.tsx: Form to add/edit/delete Manual Project items (array). Handles date inputs, URL, and simple skill input (comma-separated). Sends PATCH { manualProjects: [...] } to /api/profile.
+components/EditHeaderForm.tsx: Form to edit Name, Headline, Photo URL (text input), and Contact Links. Sends PATCH { name: ..., headline: ..., photoURL: ..., contactInfo: {...} } to /api/profile.
+Frontend Components (Display/Layout):
+components/DashboardSidebar.tsx: Renders navigation links to dashboard sections. Highlights active section based on activeSectionId prop.
+components/CompactProjectCard.tsx: Renders a minimalist tile for platform projects on the dashboard.
+Shared Utilities/Refactoring Notes:
+authenticateUser helper function in API routes should be moved to a shared file (lib/serverAuthUtils.ts).
+isValidDate helper function should be moved to lib/dateUtils.ts.
+Profile type definitions (StudentProfile, etc.) should be moved to lib/types/profile.ts.
+Firebase client and admin SDK initialization (app/firebase.ts, lib/firebaseAdmin.ts) are assumed to be correctly set up.
+Generic Modal component (components/Modal.tsx) was modified to only close via the 'X' button and prevent body scroll.
+State of Remaining Tasks:
+Full Profile Type Definition: Consolidate and move the inline StudentProfile interface and nested types to lib/types/profile.ts.
+Helper Function Refactoring: Move isValidDate and formatInputDate (from form components) to lib/dateUtils.ts.
+Backend Validation: Enhance validation in the PATCH /api/profile API route to perform deeper checks on the structure and content of the arrays being updated (e.g., ensuring each item has required fields, correct data types).
+Firebase Storage Integration: Implement actual image upload for profile pictures and community post media using Firebase Storage instead of temporary Data URLs.
+Backend Cleanup: Implement Firebase Cloud Functions triggered on deletion (e.g., post deletion, profile deletion) to clean up subcollections (comments, likes) and associated Storage files.
+Community Feed Enhancements: Implement backend search, sorting by likes, DELETE API for comments, and inline replies UI.
+Dashboard Enhancements: Implement placeholder widget functionality, Resume Export, Visibility/Privacy settings, Mobile Navigation for the dashboard sidebar.
+Testing: Comprehensive testing of all features, API endpoints, and UI interactions.
+This summary provides a detailed overview of the features built, the files involved, their purpose, and the current state, including key patterns and remaining work. This should be a solid basis for another AI to understand the project and continue development.
+
+
+
+The user presented a detailed overview of the project's progress, confirming the existence of core features including a functional (though still being developed) Resume Style Dashboard and a Community Feed. The focus was then narrowed to making the Dashboard fully functional and adding user search/profile viewing.
+Features Implemented/Enhanced During this Session:
+Resume Style Dashboard (/dashboard):
+Resolved initial data fetching issues (corrected /api/profile GET URL).
+Implemented robust loading and error handling states for authentication and data fetches (profile, projects).
+Refined the main profile header avatar display logic to use a standard <img> tag with an onError fallback to an initials avatar, handling cases of missing/invalid photoURL.
+Added simple UI enhancements like a loading spinner inside the search input field and a clear button for the search term.
+Implemented basic loading skeletons for the platform projects list.
+Modified rendering logic to hide entire profile sections (e.g., Experience, Education) if they contain no data, making the profile cleaner when fields are empty.
+Ensured "Add" / "Add Another" buttons appear correctly based on content presence in editable sections.
+Verified Edit Modal functionality and successful profile data refetching after saves.
+User Directory / Explore Page (/users):
+Created a new static page /users accessible via the Navbar.
+Implemented a basic search input field and display area for results.
+Implemented client-side state management for the search term, results, loading, and errors.
+Integrated lodash.debounce to limit API calls while typing.
+Implemented "Recent Searches" functionality using localStorage to store and display recent successful search terms as clickable buttons. Includes a "Clear History" option.
+Displayed search results as a list of user cards, including avatar (with initials fallback), name, and headline.
+Made each search result link to the new public user profile page (/profile/[userId]).
+Added loading skeletons for the search results list.
+Added clearer initial prompt messages based on search term length and search state.
+Dynamic User Profile Viewing Page (/profile/[userId]):
+Created a new dynamic route page /profile/[userId] to display the profile of the user specified by the userId URL parameter.
+Implemented authentication check: only logged-in users can view any profile.
+Implemented a redirect: if a user tries to view their own profile via this route (/profile/<my_user_id>), they are redirected to their Dashboard (/dashboard).
+Implemented fetching of the target user's profile data (/api/profile?userId=...) using the modified API.
+Implemented fetching of the target user's platform project data (/api/projects?userId=...) using the modified API.
+Integrated Community Posts: Implemented fetching of the target user's recent Community Feed posts (/api/community/posts?userId=...&limit=10) using the modified API.
+Displayed profile data, projects, and recent community posts in a read-only format (no edit buttons).
+Reused display logic/components from the Dashboard page where appropriate (e.g., sections structure, CompactProjectCard).
+Applied rendering logic to hide entire profile sections (including the main Projects section and the new Community Posts section) if they have no content to display.
+Implemented robust loading and error handling states across all data fetches on this page.
+Refined the main profile header avatar display logic here as well, ensuring it correctly displays the target user's avatar or fallback.
+Added a "View All" link for community posts if posts are present, linking to the main Community Feed page filtered by the user ID (/community?userId=...).
+Backend API Modifications Implemented/Refined:
+app/api/profile/route.ts (GET handler):
+Crucial Change: Modified to check for and use the userId query parameter (req.nextUrl.searchParams.get('userId')).
+If userId parameter is present, fetches the profile document studentProfiles/{userId}.
+If userId parameter is not present, defaults to fetching the profile of the authenticated user (studentProfiles/{authenticated_user_id}).
+Authentication: Requires the requesting user to be authenticated (await authenticateUser(req)).
+Handles 404 if a requested userId profile is not found.
+Retains logic to create a default profile if the authenticated user's profile is missing.
+app/api/projects/route.ts (GET handler):
+Crucial Change: Added authenticateUser(request) check at the beginning, requiring all GET requests to be authenticated.
+Modified to check for and use the userId query parameter (req.nextUrl.searchParams.get('userId')).
+If userId parameter is present, filters projects by where('creatorId', '==', userId).
+If userId parameter is not present, does not filter by creatorId (allowing query to potentially return all projects accessible to authenticated users based on rules and limit).
+app/api/community/posts/route.ts (GET handler):
+Crucial Change: Added authenticateUser(request) check at the beginning, requiring all GET requests to be authenticated.
+Modified to check for and use the userId query parameter (req.nextUrl.searchParams.get('userId')).
+If userId parameter is present, filters posts by where('creatorId', '==', userId).
+If userId parameter is not present, does not filter by creatorId (allowing query to return all posts accessible to authenticated users based on rules and limit/pagination).
+Retains existing logic for limit and pagination (lastDocId).
+app/api/users/search/route.ts (GET handler):
+Created a new endpoint specifically for user search.
+Authentication: Requires the requesting user to be authenticated.
+Takes a term query parameter.
+Performs a basic Firestore query: firestore.collection('studentProfiles').orderBy('name').startAt(term).endAt(term + '\uf8ff').limit(20). This is a case-sensitive, name prefix only search.
+Returns results in the format { users: [...] }.
+Includes basic server-side validation for the search term length.
+Note: This specific query requires a Firestore index on the name field (ascending).
+Firestore Security Rules:
+Throughout the process, the importance of Firestore Security Rules was emphasized.
+Rules for studentProfiles, projects, and feedPosts collections must allow read access for authenticated users (allow read: if request.auth != null;) to support viewing other users' data via the updated APIs.
+write access remains restricted to the owner (request.auth.uid == resource.data.creatorId or resource.data.userId).

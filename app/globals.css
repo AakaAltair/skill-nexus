@@ -1,0 +1,140 @@
+/* app/globals.css */
+
+/* Import Tailwind CSS base, components, and utilities */
+/* Keep this as per your working code */
+@import "tailwindcss";
+
+
+/* Define Light Theme CSS Variables */
+/* These will be the default values as dark mode media query is removed */
+:root {
+  --background: #ffffff; /* White background */
+  --foreground: #171717; /* Dark text (almost black) */
+  /* Font variables will be populated by next/font */
+  /* Ensure your next.config.js and app/layout.tsx correctly set these */
+  --font-geist-sans: unset; /* Placeholder, will be set by layout */
+  --font-geist-mono: unset; /* Placeholder, will be set by layout */
+
+  /* Define accent colors as variables */
+  --accent-blue: #0070F3; /* Accent 1 */
+  --accent-pink: #FF4081; /* Accent 2 */
+  --accent-green: #4CAF50; /* Accent 3 */
+  --accent-gray: #4b5563; /* Using a Tailwind gray for neutral sections */
+
+  /* Define theme text colors as variables for consistency */
+  /* These are for reference or use in custom non-tailwind CSS */
+  --text-light: #171717; /* Black/Dark text on light backgrounds */
+  --text-dark: #ffffff; /* White text on dark backgrounds */
+  --text-muted-light: #4b5563; /* Muted text on light backgrounds (gray-700) */
+  --text-muted-dark: #d1d5db; /* Muted text on dark backgrounds (gray-300) */
+}
+
+/* Inline theme variables for Tailwind (optional but can be useful) */
+/* Keep this as per your working code */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-mono);
+  /* Expose accent colors if needed in tailwind.config.js */
+  --color-accent-blue: var(--accent-blue);
+  --color-accent-pink: var(--accent-pink);
+  --color-accent-green: var(--accent-green);
+  --color-accent-gray: var(--accent-gray);
+
+  /* Expose theme text colors if needed */
+   --color-text-light: var(--text-light);
+   --color-text-dark: var(--text-dark);
+   --color-text-muted-light: var(--text-muted-light);
+   --color-text-muted-dark: var(--text-muted-dark);
+}
+
+/* --- Dark Mode Block REMOVED --- */
+/* This block remains commented out as per your working code */
+/*
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+*/
+/* --- End REMOVED Block --- */
+
+
+/* Apply base body styles using the default (light theme) variables */
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif; /* Use theme font */
+  /* Add this to prevent horizontal scroll issues from animations */
+  overflow-x: hidden;
+  /* Ensure smooth scroll behavior when clicking internal links (e.g., #features) */
+  scroll-behavior: smooth;
+}
+
+
+/* --- Custom styles for the NEW dot-based scroll spy sidebar --- */
+/* The container for the dots */
+.dot-sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 12px; /* Space between dots */
+  padding: 16px 8px; /* Overall padding */
+}
+
+/* Individual dot link style */
+.dot-sidebar-link {
+  display: block;
+  width: 8px; /* Size of the dot */
+  height: 8px;
+  border-radius: 50%; /* Make it circular */
+  background-color: #9ca3af; /* Default color (gray-400) */
+  transition: background-color 0.3s ease-in-out, transform 0.3s ease-in-out;
+  cursor: pointer;
+  position: relative; /* Needed for tooltip */
+}
+
+/* Hover effect for the dot */
+.dot-sidebar-link:hover {
+  background-color: #4b5563; /* Darker gray on hover (gray-600) */
+  transform: scale(1.2); /* Slightly enlarge on hover */
+}
+
+/* Style for the active dot */
+.dot-sidebar-link.active {
+  background-color: var(--accent-blue, #0070F3); /* Use Accent 1 blue for active */
+  transform: scale(1.4); /* Make active dot larger */
+}
+
+/* Optional: Add a tooltip for the section name on hover */
+.dot-sidebar-link::after {
+  content: attr(data-tooltip); /* Get text from data-tooltip attribute */
+  position: absolute;
+  left: 150%; /* Position tooltip to the right */
+  top: 50%;
+  transform: translateY(-50%);
+  background-color: rgba(0, 0, 0, 0.75); /* Dark semi-transparent background */
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem; /* text-xs */
+  white-space: nowrap;
+  opacity: 0; /* Hidden by default */
+  visibility: hidden;
+  transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+  pointer-events: none; /* Prevent tooltip from interfering with clicks */
+  z-index: 10;
+}
+
+.dot-sidebar-link:hover::after {
+  opacity: 1; /* Show tooltip on hover */
+  visibility: visible;
+}
+
+
+/* --- REMOVED Slick Carousel styles --- */
+/* Carousel specific styles are no longer needed */
+
+
+/* Add any other global styles below */

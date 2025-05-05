@@ -1,0 +1,108 @@
+**Root Directory** 
+
+*   ./README.md
+*   ./components.json
+*   ./eslint.config.mjs
+*   ./next.config.ts
+*   ./note.txt
+*   ./package-lock.json
+*   ./package.json
+*   ./postcss.config.mjs
+*   ./project_files.txt
+*   ./tsconfig.json
+
+**.\_idx Directory**
+
+*   .idx/dev.nix
+*   .idx/integrations.json
+
+**\.vscode Directory**
+
+*   .vscode/settings.json
+
+**Public Directory**
+
+*   public/file.svg
+*   public/globe.svg
+*   public/index.html
+*   public/next.svg
+*   public/vercel.svg
+*   public/window.svg
+
+
+**Components Directory**
+
+*   components/AnnouncementsStream.tsx
+*   components/ClassroomBanner.tsx
+*   components/Modal.tsx
+*   components/PlacedStudentFeed.tsx
+*   components/PlacedStudentPost.tsx
+*   components/PlacementAnnouncementsStream.tsx
+*   components/PlacementCard.tsx
+*   components/PlacementChatSidebar.tsx
+*   components/PlacementDetailView.tsx
+*   components/PlacementDriveBanner.tsx
+*   components/PlacementFilters.tsx
+*   components/ProjectCard.tsx
+*   components/ProjectChatSidebar.tsx
+*   components/ResourceAnnouncementsStream.tsx
+*   components/ResourceBanner.tsx
+*   components/ResourceCard.tsx
+*   components/ResourceChatSidebar.tsx
+*   - components/ui/button.tsx
+
+**app Directory**
+
+*   app/components/Navbar.tsx
+*   app/favicon.ico
+*   app/firebase.ts
+*   app/globals.css
+*   app/layout.tsx
+*   app/page.tsx
+*   - app/nexai/page.tsx
+*   - app/placements/page.tsx
+*   - app/projects/page.tsx
+*   - app/resources/page.tsx
+*   - app/trends/page.tsx
+*   - app/placements/create/page.tsx
+*   - app/projects/[projectId]/page.tsx
+*   - app/projects/create/page.tsx
+*   - app/resources/[resourceId]/page.tsx
+*   - app/resources/create/page.tsx
+*   - app/placements/[driveId]/edit/page.tsx
+*   - app/placements/achievements/[achievementId]/page.tsx
+*   - app/placements/achievements/create/page.tsx
+*   - app/placements/achievements/[achievementId]/edit/page.tsx
+*   - app/projects/[projectId]/edit/page.tsx
+*   - app/resources/[resourceId]/edit/page.tsx
+
+
+
+**app/api Directory**
+
+*   app/api/nexai/route.ts
+*   app/api/placement/achievements/route.ts
+*   app/api/placement/achievements/[achievementId]/route.ts
+*   app/api/placement/drives/route.ts
+*   app/api/placement/drives/[driveId]/route.ts
+*   app/api/placement/drives/[driveId]/comments/route.ts
+*   app/api/placement/drives/[driveId]/updates/route.ts
+*   app/api/projects/route.ts
+*   app/api/projects/[projectId]/route.ts
+*   app/api/projects/[projectId]/comments/route.ts
+*   app/api/projects/[projectId]/updates/route.ts
+*   app/api/resources/route.ts
+*   app/api/resources/[resourceId]/route.ts
+*   app/api/resources/[resourceId]/comments/route.ts
+*   app/api/resources/[resourceId]/updates/route.ts
+*   app/api/trends/route.ts
+
+**lib Directory**
+
+*   lib/dateUtils.ts
+*   lib/firebaseAdmin.ts
+*   lib/themeUtils.ts
+*   lib/utils.ts
+*   - lib/types/placement.ts
+*   - lib/types/project.ts
+*   - lib/types/resource.ts

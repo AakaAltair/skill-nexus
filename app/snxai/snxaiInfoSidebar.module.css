@@ -1,0 +1,181 @@
+/* /home/user/new-skill-fire/app/snxai/snxaiInfoSidebar.module.css */
+
+/* Define CSS variables specific to the sidebar or reuse from main if imported */
+:root {
+    /* Colors for the sidebar gradient */
+    --color-ai-sidebar-bg-start: #eef2ff; /* Very light blue */
+    --color-ai-sidebar-bg-middle: #c3dafe; /* Lighter blue */
+    --color-ai-sidebar-bg-end: #a78bfa; /* Light purple */
+ 
+    /* Border color */
+    --color-ai-sidebar-border: #4f46e5; /* Indigo (Techy blue) */
+ 
+    /* Text Colors */
+    --color-ai-sidebar-text: #374151; /* Default gray text */
+    --color-ai-sidebar-title: #1e3a8a; /* Darker blue for titles */
+    --color-ai-sidebar-link: #2563eb; /* Blue for links */
+    --color-ai-sidebar-icon: #4f46e5; /* Indigo for icons */
+    --color-ai-sidebar-coming-soon: #6b7280; /* Gray for "Coming Soon" */
+ 
+    /* Overlay color */
+    --color-ai-overlay-bg: rgba(0, 0, 0, 0.5); /* Semi-transparent black */
+ }
+ 
+ 
+ .sidebar {
+   position: fixed; /* Fixed position relative to viewport */
+   top: 0;
+   left: 0;
+   height: 100%; /* Full height */
+   width: 320px; /* Fixed width */
+   /* Background gradient for a techy feel */
+   background: linear-gradient(160deg, var(--color-ai-sidebar-bg-start) 0%, var(--color-ai-sidebar-bg-middle) 50%, var(--color-ai-sidebar-bg-end) 100%);
+   border-right: 2px solid var(--color-ai-sidebar-border); /* Prominent border on the right */
+   box-shadow: 4px 0 15px rgba(0, 0, 0, 0.2); /* Stronger shadow */
+   transform: translateX(-100%); /* Start off-screen to the left */
+   transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1); /* Custom cubic-bezier for smooth animation */
+   z-index: 55; /* Ensure it's above main page content (z-index 0 or 1) and its own overlay (z-index 54), below Modals (z-index 60+) */
+   padding: 2rem 1.5rem; /* Increased top/bottom padding */
+   overflow-y: auto; /* Enable scrolling for content */
+   color: var(--color-ai-sidebar-text); /* Default text color */
+   font-family: 'Geist Sans', sans-serif; /* Apply the font family */
+   display: flex; /* Use flex column layout */
+   flex-direction: column;
+   user-select: text; /* Allow selecting text inside */
+ }
+ 
+ /* Modifier class to slide the sidebar into view */
+ .sidebarOpen {
+   transform: translateX(0); /* Slide into view */
+ }
+ 
+ 
+ /* Header section inside the sidebar */
+ .header {
+   display: flex;
+   align-items: center;
+   margin-bottom: 2rem; /* More space below header */
+   padding-bottom: 1rem; /* Space below the border */
+   border-bottom: 1px solid rgba(79, 70, 229, 0.3); /* Fainter border using gradient color */
+   flex-shrink: 0; /* Prevent shrinking */
+ }
+ 
+ /* Title within the header */
+ .title {
+   font-size: 1.25rem; /* Larger title */
+   font-weight: 700; /* Bold title */
+   color: var(--color-ai-sidebar-title); /* Darker blue color */
+   margin-left: 0.75rem; /* Space after the icon */
+ }
+ 
+ /* Close button in the header */
+ .closeButton {
+   margin-left: auto; /* Push to the right edge */
+   background: none; /* No background */
+   border: none; /* No border */
+   padding: 0.375rem; /* Padding around icon */
+   border-radius: 9999px; /* Fully rounded */
+   color: var(--color-ai-sidebar-border); /* Techy blue color */
+   cursor: pointer;
+   transition: background-color 0.15s, color 0.15s; /* Smooth transitions */
+ }
+ .closeButton:hover {
+   background-color: rgba(79, 70, 229, 0.1); /* Subtle hover background using color with opacity */
+   color: #4338ca; /* Darker techy blue on hover */
+ }
+ .closeButton:focus {
+    outline: none;
+    /* Techy blue focus ring */
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.5);
+ }
+ 
+ 
+ /* Introduction text */
+ .introduction {
+   font-size: 0.9375rem; /* Slightly larger text */
+   margin-bottom: 2rem; /* More space below intro */
+   line-height: 1.6;
+   color: var(--color-ai-sidebar-text); /* Standard text color */
+   flex-shrink: 0; /* Prevent shrinking */
+ }
+ 
+ /* Section titles within the sidebar content */
+ .sectionTitle {
+   font-size: 1.0625rem; /* Slightly larger section titles */
+   font-weight: 700; /* Bold titles */
+   color: var(--color-ai-sidebar-title); /* Darker blue */
+   margin-top: 2rem; /* More space above sections */
+   margin-bottom: 1rem; /* More space below titles */
+   border-bottom: 1px solid rgba(79, 70, 229, 0.3); /* Consistent border style */
+   padding-bottom: 0.5rem; /* More padding below border */
+   flex-shrink: 0; /* Prevent shrinking */
+ }
+ 
+ /* List of features/items */
+ .featureList {
+   list-style: none; /* Remove default list bullets */
+   padding: 0;
+   margin: 0;
+   font-size: 0.9rem; /* Font size for list items */
+ }
+ 
+ /* Individual feature/list item */
+ .featureItem {
+   display: flex;
+   align-items: flex-start; /* Align icon to the top of the text */
+   margin-bottom: 1rem; /* More space between items */
+   gap: 0.75rem; /* Space between icon and text */
+   line-height: 1.5;
+ }
+ 
+ /* Icon within a feature item */
+ .featureIcon {
+   flex-shrink: 0; /* Prevent icon from shrinking */
+   color: var(--color-ai-sidebar-icon); /* Techy blue color */
+   width: 1.25rem; /* Larger icon size */
+   height: 1.25rem;
+   margin-top: 2px; /* Slight vertical adjustment for alignment */
+ }
+ 
+ /* Description text within a feature item */
+ .featureDescription {
+   color: var(--color-ai-sidebar-text); /* Standard text color */
+ }
+ 
+ /* Style for links within feature descriptions */
+ .featureDescription a {
+     color: var(--color-ai-sidebar-link); /* Blue link color */
+     text-decoration: underline;
+     /* Optional: Add hover effect */
+     /* transition: color 0.15s; */
+ }
+ /* .featureDescription a:hover { color: #1d4ed8; } */
+ 
+ 
+ /* Style for "Coming Soon" features */
+ .comingSoon {
+     font-style: italic; /* Italicize */
+     color: var(--color-ai-sidebar-coming-soon); /* Gray color */
+     opacity: 0.8; /* Slightly faded */
+ }
+ 
+ /* Style for the overlay that appears behind the sidebar */
+ .overlay {
+   position: fixed;
+   /* Cover the entire viewport */
+   top: 0;
+   left: 0;
+   right: 0;
+   bottom: 0;
+   background-color: var(--color-ai-overlay-bg); /* Semi-transparent black */
+   z-index: 54; /* Below sidebar (55), above main content (0/1) */
+   transition: opacity 0.4s ease-in-out; /* Match sidebar transition */
+   opacity: 0; /* Start hidden */
+   pointer-events: none; /* Allow clicks to pass through when hidden */
+ }
+ 
+ /* Modifier class to make the overlay visible and clickable */
+ .overlayVisible {
+   opacity: 1; /* Fade in */
+   pointer-events: auto; /* Block clicks when visible */
+ }
