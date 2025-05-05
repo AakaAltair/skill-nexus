@@ -73,7 +73,7 @@ const Navbar: React.FC = () => {
   ];
 
   const rightNavLinks: NavLinkItem[] = [
-    { href: "/snxai-feature", label: "SNX AI", icon: Cpu }, // Example link, adjust as needed
+    { href: "/snxai", label: "SNXAI", icon: Cpu }, // Example link, adjust as needed
     { href: "/placements", label: "Placement", icon: Briefcase }, // Assuming /placements page exists
     { href: "/projects", label: "Projects", icon: FolderKanban },
     { href: "/resources", label: "Resources", icon: Library },
